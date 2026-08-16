@@ -1,0 +1,21 @@
+{
+  "next": null,
+  "previous": "https://project-gutenberg-free-books-api1.p.rapidapi.com/books?page=1&page_size=2",
+  "results": [
+    {
+      "id": 2701,
+      "title": "Moby Dick; Or, The Whale",
+      "alternative_title": null,
+      "authors": [{"id": 9, "name": "Melville, Herman"}],
+      "subjects": ["Whaling -- Fiction", "Sea stories"],
+      "bookshelves": ["Best Books Ever Listings"],
+      "formats": {"text/plain": "https://www.gutenberg.org/files/2701/2701-0.txt"},
+      "download_count": 90000,
+      "issued": "2001-07-01T00:00:00.000Z",
+      "summary": "\"Moby Dick\" by Herman Melville follows Ishmael aboard the Pequod under Captain Ahab.",
+      "reading_ease_score": null,
+      "cover_image": null,
+      "removed_from_catalog": null
+    }
+  ]
+}

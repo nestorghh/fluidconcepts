@@ -1,0 +1,46 @@
+{
+  "next": "https://project-gutenberg-free-books-api1.p.rapidapi.com/books?page=2&page_size=2",
+  "previous": null,
+  "results": [
+    {
+      "id": 1342,
+      "title": "Pride and Prejudice",
+      "alternative_title": null,
+      "authors": [{"id": 68, "name": "Austen, Jane"}],
+      "subjects": [
+        "Courtship -- Fiction",
+        "England -- Fiction",
+        "Love stories"
+      ],
+      "bookshelves": ["Best Books Ever Listings", "Harvard Classics"],
+      "formats": {
+        "text/plain": "https://www.gutenberg.org/files/1342/1342.txt",
+        "text/html": "https://www.gutenberg.org/ebooks/1342.html.images",
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/1342.epub3.images"
+      },
+      "download_count": 183505,
+      "issued": "1998-06-01T00:00:00.000Z",
+      "summary": "\"Pride and Prejudice\" by Jane Austen is a novel published in 1813. It follows Elizabeth Bennet, who must learn to see past first impressions.",
+      "reading_ease_score": "69.20",
+      "cover_image": "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg",
+      "removed_from_catalog": null
+    },
+    {
+      "id": 84,
+      "title": "Frankenstein; Or, The Modern Prometheus",
+      "alternative_title": "Frankenstein",
+      "authors": [{"id": 61, "name": "Shelley, Mary Wollstonecraft"}],
+      "subjects": ["Horror tales", "Science fiction"],
+      "bookshelves": ["Gothic Fiction"],
+      "formats": {
+        "application/epub+zip": "https://www.gutenberg.org/ebooks/84.epub3.images"
+      },
+      "download_count": 120000,
+      "issued": "1993-10-01",
+      "summary": null,
+      "reading_ease_score": 72.5,
+      "cover_image": null,
+      "removed_from_catalog": "Copyright claim received 2019-04-02"
+    }
+  ]
+}

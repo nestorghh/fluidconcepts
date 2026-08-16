@@ -1,0 +1,38 @@
+run:
+  mode: incremental        # full | incremental
+  max_books: 1000          # PoC cap; raise once on the paid tier
+  max_requests_per_run: 1000
+  log_level: INFO
+
+storage:
+  backend: local           # local | s3
+  local_path: ./data/books
+  s3_bucket: public-domain-books
+  s3_prefix: metadata/
+  compression: zstd
+  rows_per_shard: 5000
+
+sources:
+  - name: gutenberg
+    enabled: true
+    # Verified live. The vendor's published docs give a different host and an
+    # /api path prefix; neither exists. See providers/gutenberg.py.
+    base_url: https://project-gutenberg-free-books-api1.p.rapidapi.com
+    api_key_env: RAPIDAPI_KEY     # key is read from the environment, never inlined
+    page_size: 100                # verified maximum; larger values are silently capped
+    params:
+      # Verified: sorts by ascending Gutenberg ID. A stable order matters -- new books
+      # get higher IDs and land at the end, which is what makes page checkpointing valid.
+      sort: ascending
+    request_timeout: 30
+    max_retries: 4
+    # The gateway throttles hard on the free plan: back-to-back requests return 429.
+    # Verified comfortable at 12s; lower this on a paid plan.
+    min_request_interval: 12
+
+preview:
+  enabled: true
+  chars: 4000              # spec range is 3,000-5,000
+  cleaning_mode: simple
+  text_requests_per_run: 500
+  order_by: download_count

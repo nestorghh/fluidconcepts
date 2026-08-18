@@ -1,0 +1,484 @@
+================================================================================
+PUBLIC DOMAIN BOOK METADATA PIPELINE - SESSION NOTES
+Sessions: 2026-08-15 (build) and 2026-08-18 (HathiTrust + investigation)
+Working directory: /Users/infinity/fluidConcepts
+================================================================================
+
+This is a written record of the work and findings, not a verbatim transcript.
+Every number below was measured against the live sources, not taken from vendor
+documentation - which, as section 3 explains, turned out to matter a lot.
+
+
+================================================================================
+1. OBJECTIVE
+================================================================================
+
+Build a lightweight Python pipeline that periodically collects metadata for
+public domain books from trusted external sources. The metadata becomes a
+reference corpus for downstream ML:
+
+  - a searchable catalog of known public-domain books
+  - semantic search over metadata and preview text
+  - duplicate detection against the existing public-domain corpus
+  - preventing ML workflows from reprocessing already-public books
+
+Requirements: configurable storage (local + S3), incremental updates, repeated
+execution under an external scheduler, minimal dependencies, type hints,
+pluggable providers, and a schema that can gain embeddings later without
+changing the ingestion pipeline.
+
+
+================================================================================
+2. WHAT WAS BUILT
+================================================================================
+
+Production pipeline
+-------------------
+  pd_books/
+      config.py            config.yaml + PDBOOKS__* env overrides (pydantic)
+      models.py            Book/Author schema, content_hash, pyarrow schema
+      http.py              retries, 429 backoff, request budget, rate pacing
+      state.py             checkpoint: last_page, seen hashes, pending text
+      pipeline.py          two-stage orchestration (never imports a provider)
+      cli.py               argument parsing and overrides
+      providers/
+          base.py          BaseProvider ABC + name->class registry
+          gutenberg.py     API paging and normalization
+      storage/
+          base.py          BaseStorage ABC (moves bytes only)
+          parquet.py       serialization + read_catalog() dedupe
+          local.py         filesystem backend
+          s3.py            S3 backend (boto3 imported lazily)
+  config.yaml
+  scripts/probe_api.py     live capability probe
+  docs/api-capabilities.md verified API behaviour
+  tests/                   71 tests, all offline
+
+Demo (self-contained, does not import pd_books)
+-----------------------------------------------
+  demo/fetch_books.py      fetch N books -> JSON + CSV + Parquet
+                           --source gutenberg | hathitrust
+  demo/app.py              local dashboard, both sources merged
+  demo/output/             generated data files
+
+Dependencies: pydantic, PyYAML, pyarrow, boto3 (S3 extra), pandas (demo only).
+Python 3.14.4; all have cp314 wheels, no source builds.
+
+
+================================================================================
+3. SOURCE 1: PROJECT GUTENBERG (gutenbergapi.com)
+================================================================================
+
+3.1 THE PUBLISHED DOCUMENTATION IS WRONG
+----------------------------------------
+gutenbergapi.com is a commercial RapidAPI proxy, not an official Project
+Gutenberg API. Its published examples give a host and a path that do not exist.
+
+                published                          actually works
+  host    project-gutenberg-books-api...     project-gutenberg-free-books-api1...
+  path    /api/books                         /books
+
+The two failure modes are distinguishable, which is what made this findable:
+
+  {"message":"API doesn't exists"}          + header x-rapidapi-proxy-response:true
+      -> the RapidAPI PROXY rejected the Host header. Wrong host.
+
+  {"message":"Endpoint '/api/books' does not exist"}
+      -> the BACKEND rejected the path. Right host, wrong path.
+
+Losing hours to this is easy because the first error looks like an auth problem.
+
+3.2 VERIFIED CAPABILITIES (probe, 2026-08-15)
+---------------------------------------------
+  lists catalog with no query   yes, GET /books returns everything paginated
+  default page size             32
+  maximum page_size             100 (larger values silently capped, not rejected)
+  stable sort                   yes, sort=ascending orders by Gutenberg ID
+  ordering= / order_by=         silently ignored (falls back to popularity)
+  total count in response       NO count field; page until next is null
+  free tier quota               1000 requests/month
+  rate limiting                 aggressive; back-to-back requests 429.
+                                12s spacing verified comfortable
+
+sort=ascending matters more than it looks: new books get higher IDs and land at
+the END of a stable ordering. That is what makes page-number checkpointing valid.
+
+3.3 THE SUMMARY FIELD (overturned a design assumption)
+------------------------------------------------------
+The docs imply no summary exists. In reality the list response includes a
+`summary` field populated for ~96.5% of records (193 of the first 200 sampled)
+with real 600-1200 character editorial abstracts.
+
+This arrives WITH THE LISTING at no extra request cost. It is the spec's
+first-choice searchable text, and it demotes the per-book /books/{id}/text
+endpoint to a fallback for the remaining ~3.5%.
+
+Without this discovery the pipeline would have spent one request per book on
+text - roughly 79,000 requests against a 1000/month quota.
+
+3.4 FIELDS IN THE LIST RESPONSE
+-------------------------------
+  id, title, alternative_title, authors[{id,name}], subjects[], bookshelves[],
+  formats{mime:url}, download_count, issued, summary, reading_ease_score,
+  cover_image, removed_from_catalog
+
+`formats` carries real download URLs; the text/plain entry is preferred for
+download_url, falling back to a URL derived from the Gutenberg ID (free, no
+request needed).
+
+3.5 FIELDS THAT DO NOT EXIST
+----------------------------
+No language, publisher, media_type, or ISBN anywhere in the response. `issued`
+is Gutenberg's own release date, NOT original publication - ID 1 is dated
+1971-12-01, and Pride and Prejudice is 1998-06-01 rather than 1813. Confirmed
+independently against Project Gutenberg's own RDF metadata.
+
+These stay null in the schema by design, waiting for a richer provider.
+
+3.6 COST MODEL
+--------------
+  1,000-book PoC                    ~10 requests
+  full catalog (~79k) @ page_size=100  ~790 requests
+  preview text fallback             1 request per book lacking a summary (~3.5%)
+
+A full backfill fits inside one month of the free tier, but only just.
+
+
+================================================================================
+4. SOURCE 2: HATHITRUST (hathifiles)
+================================================================================
+
+4.1 WHAT IT IS
+--------------
+Bulk TSV dumps, not an API. No key, no signup, no quota.
+
+  index:   https://www.hathitrust.org/files/hathifiles/hathi_file_list.json
+  monthly: hathi_full_YYYYMM01.txt.gz   ~1.22 GB, ~19.6M rows
+  daily:   hathi_upd_YYYYMMDD.txt.gz    ~6-8 MB,  ~215k rows
+
+NOTE: hathitrust.org's HTML pages return 403 to scripted requests (WAF). The
+static file URLs and the JSON index serve fine with a browser User-Agent. Only
+the human-facing documentation pages are blocked.
+
+4.2 THE INDEX (hathi_file_list.json)
+------------------------------------
+A manifest of the downloadable files - contains no book data. Flat JSON array,
+currently 73 entries. Six fields per entry:
+
+  filename, full (true=monthly / false=daily), size, created, modified, url
+
+Used for discovery so filenames never have to be guessed. Guessing breaks
+because: today's daily may not be published yet (created ~04:38 ET), the
+monthly is a job that runs rather than a contract, retention shifts daily, and
+you would lose `size` (so you could not warn about a 1.2 GB download).
+
+4.3 FILE FORMAT
+---------------
+  - gzipped TSV, NO header row
+  - 26 columns, fixed order (hardcoded in demo/fetch_books.py as HATHI_COLUMNS)
+  - titles contain bare quote characters, so the parser MUST use
+    csv.QUOTE_NONE. The default quoting mis-splits rows.
+
+Column order:
+  1 htid                  2 access                3 rights
+  4 ht_bib_key            5 description           6 source
+  7 source_bib_num        8 oclc_num              9 isbn
+ 10 issn                 11 lccn                 12 title
+ 13 imprint              14 rights_reason_code   15 rights_timestamp
+ 16 us_gov_doc_flag      17 rights_date_used     18 pub_place
+ 19 lang                 20 bib_fmt              21 collection_code
+ 22 content_provider_code 23 responsible_entity_code
+ 24 digitization_agent_code 25 access_profile_code 26 author
+
+4.4 RIGHTS CODES - WHICH MEAN PUBLIC DOMAIN
+-------------------------------------------
+Measured on one daily file (215,373 rows):
+
+  pd       90,710   public domain                      <- PUBLIC DOMAIN
+  pdus     13,722   public domain in the US            <- PUBLIC DOMAIN
+  pd-pvt      935   public domain, private access      <- PUBLIC DOMAIN
+  ic       95,777   in copyright
+  und      13,290   undetermined
+  icus        292   in copyright in the US
+  op           25   out of print
+  nobody        2   restricted
+  cc-*        ~490  Creative Commons (open, but NOT public domain)
+
+Across the whole August monthly file: 8,129,991 of 19,605,849 rows are public
+domain = 41.5%.
+
+The demo filters to {pd, pdus, pd-pvt} by default; --all-rights disables it.
+
+4.5 ARE MONTHLY FILES CUMULATIVE? (tested, yes)
+-----------------------------------------------
+Each monthly full file is a COMPLETE SNAPSHOT of the corpus, not a diff.
+
+Test: sampled 120,001 htids from the July 1 file, then scanned all 19,605,849
+rows of the August 1 file.
+  RESULT: 0 missing. Every July id was present in August.
+  Sizes: July 1.219 GB -> August 1.221 GB.
+
+Caveat: proven for a 120k sample, not all 19.6M rows. HathiTrust can withdraw
+volumes, so zero removals is not guaranteed in general - but nothing in the
+sample was removed and the file grew.
+
+4.6 DO THE DAILIES ROLL INTO THE MONTHLY? (tested, yes)
+-------------------------------------------------------
+Used July's dailies as a natural experiment between the two snapshots.
+
+The July 15 daily contained 9,140 records:
+  - 9 NEW records          -> 9 of 9 present in the Aug 1 snapshot   (100%)
+  - 495 RIGHTS CHANGES     -> 495 of 495 reflected in Aug 1          (100%)
+  - stale (old value)      -> 0
+
+So:   full(Aug 1)  ==  full(Jul 1)  +  all dailies from Jul 2 .. Aug 1
+
+Real transitions observed:
+  coo.31924061453225         pdus -> pd     aug1 = pd
+  uiuo.ark:/13960/t7np22003   und -> ic     aug1 = ic
+  umn.319510007606937          ic -> pd     aug1 = pd
+
+IMPORTANT: rights move in BOTH directions. `ic -> pd` is a book entering the
+public domain; `und -> ic` is material leaving it. Treating an old `pd`
+determination as permanently true will eventually be wrong.
+
+4.7 DAILIES ARE DELTAS, NOT SNAPSHOTS
+-------------------------------------
+Aug 17 daily (215,373 rows) against the Aug 1 snapshot:
+  - 96.9% already existed  -> MODIFIED records (mostly rights re-adjudication)
+  -  3.1% were new         -> genuinely new since Aug 1
+
+So the bulk of daily churn is rights review, not new scans.
+
+4.8 ROW ORDER IS STABLE BUT NOT SORTED
+--------------------------------------
+Both months open with the same htids in the same sequence, and the order is NOT
+htid-sorted. New records are INTERLEAVED into the existing order, not appended.
+
+This caused a false alarm mid-investigation: comparing the first 120k rows of
+each month showed 132 "missing" ids. 126 turned up later in the file and the
+last 6 turned up on the full scan - all had simply been pushed down by
+insertions.
+
+  => Do NOT diff by row position. Do NOT assume the first N rows are a stable
+     sample. Join on htid.
+
+4.9 RETENTION IS A ROLLING WINDOW
+---------------------------------
+Only 2 monthly files and 71 dailies are retained (window observed: 2026-06-09
+onward). Older files are deleted, so history cannot be reconstructed from their
+archive. Archive locally whatever you need to keep.
+
+4.10 ROWS ARE VOLUMES, NOT WORKS
+--------------------------------
+A sample of 40 rows contained only 8 distinct titles - the same book scanned by
+different member libraries appears once per library. One title appeared 18
+times.
+
+For duplicate detection, collapse on oclc_num or title+author. Do not treat each
+row as a distinct work.
+
+4.11 PERFORMANCE
+----------------
+Streaming and parsing the entire 1.22 GB / 19.6M row monthly file took 49
+SECONDS. Far cheaper than assumed. The demo streams the gzip and stops early, so
+even --full never downloads the whole file when only N rows are needed.
+
+4.12 HATHITRUST FILLS GUTENBERG'S GAPS
+--------------------------------------
+In a 40-row sample: publication_year, publisher, language and oclc_num were all
+populated 40/40 - every field the Gutenberg API lacks entirely. (ISBN was 0/40;
+these were pre-ISBN-era volumes.)
+
+
+================================================================================
+5. BUGS FOUND AND FIXED
+================================================================================
+
+All four were caught by tests or by live runs, and all four would have shipped
+silently.
+
+5.1 Incremental missed newly published books
+    Resuming at last_page + 1 skipped the previously PARTIAL final page - which
+    is exactly where new books land in an ascending-ID ordering.
+    FIX: resume ON the last page, not after it. Costs one request; the content
+    hash discards the duplicates.
+
+5.2 Every record looked "changed" on every run
+    content_hash included searchable_text, but stage 1 hashes a record BEFORE
+    stage 2 fetches its preview text. The stored hash could therefore never
+    match a freshly-listed record, causing endless rewrites and wasted quota.
+    FIX: exclude searchable_text, text_source, text_char_count from the hash.
+    The hash answers one question only: "did upstream metadata change?"
+    (download_count and ingested_at were already excluded for the same reason -
+    download_count churns constantly.)
+
+5.3 --max-books froze the checkpoint (quadratic request growth)
+    The page checkpoint only advances when a page is FULLY consumed. Stopping
+    mid-page left last_page behind, so every later run re-read all earlier
+    pages. Over a 790-page backfill that is quadratic growth - fatal on a
+    1000/month quota.
+    FIX: honour the cap to the END of the page it lands on. The cap can now
+    overshoot by up to page_size-1 records; that is the deliberate trade.
+    Verified live: checkpoint advanced 2 -> 4.
+
+5.4 No request pacing
+    The gateway 429s on back-to-back requests. A 790-page backfill would have
+    throttled to death. The capability probe only succeeded because requests
+    were manually spaced 12s apart.
+    FIX: min_request_interval config, default 12s for this source.
+
+
+================================================================================
+6. KEY DESIGN DECISIONS
+================================================================================
+
+6.1 Embeddings are NOT stored in the book table
+    book_uid ("gutenberg:1342") is a stable primary key. Build a vector index
+    separately and join on it. That is what allows adding embeddings, or
+    swapping embedding models, without touching ingestion or rewriting the
+    corpus. Reserving null vector columns on every row would not.
+
+6.2 Explicit pyarrow schema, never inferred
+    A shard where an optional column happens to be entirely null would be typed
+    as `null` in that file and as its real type in another, breaking reads
+    across the dataset.
+
+6.3 Writes are append-only; latest-wins on read
+    A changed record is written again with a newer ingested_at.
+    storage/parquet.py:read_catalog() gives the deduplicated view. This keeps
+    writers simple and makes runs safely re-runnable.
+
+6.4 Storage backends only move bytes
+    Serialization lives in parquet.py, so local and S3 produce byte-identical
+    output with identical layout. boto3 is imported lazily - local development
+    never needs the AWS SDK.
+
+6.5 The pipeline never imports a concrete provider
+    Sources resolve by name from a registry. Adding HathiTrust / Internet
+    Archive / Open Library = one new module + a config entry, no pipeline change.
+
+6.6 Quota exhaustion is a clean stop, not a failure
+    Exit code 0, state checkpointed, next scheduled run resumes. This is what
+    makes the pipeline safe under cron/Actions/Airflow.
+
+6.7 Storage layout (identical local and S3)
+    books/provider=gutenberg/ingest_date=2026-08-15/part-0000.parquet
+    _state/gutenberg.json
+    _manifest/2026-08-15-gutenberg.json
+    Hive partitioning means the whole corpus reads in one pyarrow.dataset call.
+
+
+================================================================================
+7. HOW TO RUN
+================================================================================
+
+Setup
+-----
+  cd /Users/infinity/fluidConcepts
+  uv venv --python 3.14
+  uv pip install -e ".[s3,dev]"
+  source .venv/bin/activate
+  export RAPIDAPI_KEY=<your-key>        # Gutenberg only; never in config.yaml
+
+Tests (no key, no network)
+--------------------------
+  pytest -q                              # 71 tests
+
+Capability probe (needs key, ~12 requests)
+------------------------------------------
+  python scripts/probe_api.py
+
+Pipeline
+--------
+  python -m pd_books --config config.yaml
+  python -m pd_books --dry-run           # fetch+normalize, write nothing
+  python -m pd_books --stage metadata    # skip the text stage
+  python -m pd_books --mode full         # rescan from page 1
+  python -m pd_books --max-books 600     # continue the backfill
+
+Demo
+----
+  python demo/fetch_books.py 50                      # Gutenberg
+  python demo/fetch_books.py 50 --source hathitrust  # HathiTrust, no key
+  python demo/fetch_books.py 200 --source hathitrust --all-rights
+  python demo/fetch_books.py 50 --source hathitrust --full   # monthly file
+  python demo/app.py                                 # -> http://localhost:8000
+
+Reading the corpus
+------------------
+  import pyarrow.dataset as ds
+  t = ds.dataset("./data/books/books", partitioning="hive").to_table()
+
+  from pd_books.storage.parquet import read_catalog   # deduped latest-wins
+  books = read_catalog(storage, "gutenberg")
+
+
+================================================================================
+8. CURRENT STATE
+================================================================================
+
+  Pipeline:  400 books ingested, checkpoint last_page=4, quota ~971/1000
+  Tests:     71 passing, all offline
+  Demo:      books_gutenberg.* (25 rows), books_hathitrust.* (200 rows)
+  Dashboard: merges every books_*.parquet found; verified 225 records
+             (25 Gutenberg + 200 HathiTrust)
+
+Superseded files: demo/output/books.csv, books.parquet, books_raw.json are from
+before the per-source rename and are no longer read. Safe to delete.
+
+
+================================================================================
+9. KNOWN GAPS AND LIMITATIONS
+================================================================================
+
+9.1 Gutenberg records will have null publication_year, language, publisher and
+    ISBN. This is a source limitation, not a bug. Open Library is the natural
+    next provider - it has both publication year and ISBNs.
+
+9.2 is_public_domain for Gutenberg is set from the collection-level status
+    because the API exposes no per-record copyright flag. rights_statement
+    records that provenance. Treat it as a strong signal, not legal
+    verification.
+
+9.3 The dashboard is read-only and single-user (stdlib http.server). It is a
+    demo, not a deployable service.
+
+9.4 HathiTrust is only wired into the DEMO. It is not yet a provider in the
+    production pipeline (pd_books/providers/).
+
+9.5 The demo scripts deliberately do not share code with pd_books. That
+    duplication is intentional - the demo is meant to be handed to someone as a
+    standalone file.
+
+
+================================================================================
+10. SUGGESTED NEXT STEPS
+================================================================================
+
+10.1 ROTATE THE RAPIDAPI KEY. It was pasted into a chat session and into shell
+     history. It is a live billable credential.
+
+10.2 Add HathiTrust as a real provider in pd_books/providers/hathitrust.py.
+     The natural ingestion pattern, now evidence-backed:
+       1. bootstrap from a monthly full file (19.6M rows, ~49s stream)
+       2. apply dailies as upserts keyed on htid (~215k rows/day, 6-8 MB)
+       3. re-baseline from each new monthly - it is guaranteed to contain
+          everything the dailies said, so gaps self-heal as long as you
+          re-baseline within the ~71-day retention window
+     Note this needs no key and no quota, unlike Gutenberg.
+
+10.3 Decide how to collapse HathiTrust volumes into works (oclc_num, or
+     title+author) before using it for duplicate detection.
+
+10.4 Consider Open Library as a third provider to fill publication_year/ISBN.
+
+10.5 Quantify rights transitions over a full month (how many volumes enter vs
+     leave the public domain) to size the ML refresh cadence.
+
+10.6 Re-run scripts/probe_api.py after any plan change to refresh the verified
+     numbers in docs/api-capabilities.md.
+
+================================================================================
+END
+================================================================================

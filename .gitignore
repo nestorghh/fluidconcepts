@@ -6,3 +6,13 @@ data/
 docs/api-capabilities.json
 *.egg-info/
 .DS_Store
+
+# Generated analysis outputs - large, derived, and rebuildable from scripts/.
+# Regenerate with:
+#   python scripts/extract_authorless.py     -> authorless_pd_books.*
+#   python scripts/rights_timelines.py       -> rights_timelines_*
+# The small books_*.{csv,parquet,json} samples stay tracked so the dashboard
+# runs on a fresh clone without an API key.
+demo/output/authorless_pd_books.*
+demo/output/rights_timelines_events.parquet
+demo/output/rights_timelines_summary.*

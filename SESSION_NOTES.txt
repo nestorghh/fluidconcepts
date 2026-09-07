@@ -479,6 +479,681 @@ before the per-source rename and are no longer read. Safe to delete.
 10.6 Re-run scripts/probe_api.py after any plan change to refresh the verified
      numbers in docs/api-capabilities.md.
 
+
+================================================================================
+PART II - SESSIONS 2026-08-18 THROUGH 2026-09-07
+Full-catalog experiments, combined dataset, and rights forensics
+================================================================================
+
+Everything in Part I still holds. This part records the work done after those
+notes were written. As before, every number was measured against live data.
+
+
+================================================================================
+11. THE OVERLAP EXPERIMENT: IS GUTENBERG A SUBSET OF HATHITRUST?
+================================================================================
+
+11.1 WHAT WAS DOWNLOADED
+------------------------
+  Gutenberg  full catalog  78,875 records, 789 pages, 9,256s (~2.6h), 206 MB JSONL
+  HathiTrust monthly full  19,605,849 rows, 1.22 GB gzip, downloaded in 19.5s
+
+The Gutenberg pull cost ~790 of a 1000/month quota, leaving 147. It is resumable
+(scripts/download_all_gutenberg.py, superseded by scripts/build_catalog.py):
+each page flushes to disk with a checkpoint, so an interruption never re-spends
+quota already used.
+
+A rate-limit finding: the 12s pacing in Part I was measured WITHOUT a key. With a
+valid key, 1.5s spacing works fine. That cut the run from ~2.6h of pure waiting to
+about 30 minutes of real work.
+
+11.2 RESULT - NO, IT IS NOT A SUBSET
+------------------------------------
+  matching method                  Gutenberg books found   %
+  FULL title                       30,451                  38.6%
+  MAIN title (subtitles stripped)  41,603                  52.7%
+  TITLE + AUTHOR (high confidence) 33,533                  42.5%
+
+Defensible answer: ~42-53%. Roughly half of Gutenberg has no counterpart in
+HathiTrust under any title match attempted. Of the confident matches, 31,919
+(42.0%) have a HathiTrust copy that is ALSO public domain there.
+
+11.3 WHY THE TITLE-ONLY NUMBER OVERSTATES
+-----------------------------------------
+Generic titles collide massively: 'poems' matched 4,807 HathiTrust volumes,
+'life' 1,891, 'memoirs' 1,440. 1,141 matched titles hit >=50 volumes each,
+covering 2,926 Gutenberg books. Requiring author agreement removes most of this,
+which is why title+author (42.5%) lands BELOW main-title (52.7%).
+
+11.4 WHY IT ALSO UNDERSTATES
+----------------------------
+Two different failure modes in the unmatched list:
+
+  genuinely absent (HathiTrust scans print, so these cannot be there):
+      The 1990/1991 CIA World Factbook, The 1990 United States Census,
+      The Jargon File v2.9.10
+
+  false negatives (present but titled differently):
+      "The King James Version of the Bible" / "The Bible, King James Version"
+      "The Declaration of Independence of the United States of America"
+      "Roget's Thesaurus"
+
+Also, 18.6% of HathiTrust BOOKS have no author at all, so those could never match
+under a title+author rule regardless. 42.5% is a LOWER BOUND.
+
+11.5 A NORMALIZATION BUG CAUGHT BEFORE IT MATTERED
+--------------------------------------------------
+The first MAIN normalization cut titles at ':' or ';' to strip subtitles. But the
+two sources use DIFFERENT punctuation for the same convention:
+
+    Gutenberg :  "Moby Dick; Or, The Whale"
+    HathiTrust:  "Moby-Dick, or, The whale"
+
+Cutting only the semicolon form made the two sides disagree and turned genuine
+matches into misses. Fixed to handle both; validated on five well-known books
+(FULL 5/6, MAIN 6/6). The one FULL miss is Twenty Thousand Leagues, where
+HathiTrust appends a subtitle Gutenberg lacks - which is exactly what MAIN is for.
+
+
+================================================================================
+12. MATERIAL TYPE: CAN WE FILTER TO "BOOKS"?
+================================================================================
+
+YES for format, NO for genre. The bib_fmt column (position 20, 100% populated) is
+the MARC record type:
+
+  code  meaning                        rows          %       public domain
+  BK    Book                           12,787,978    65.23%  5,278,365
+  SE    Serial (journal/annual)         6,581,932    33.57%  2,759,883
+  MU    Music / score                     227,226     1.16%     88,786
+  MP    Map                                 6,077     0.03%      2,170
+  MX    Mixed materials (archival)          1,972     0.01%        384
+  VM    Visual material                       575     0.00%        392
+  CF    Computer file                          81     0.00%          9
+  XX    Unknown                                 8     0.00%          2
+
+Practical books-only filter:
+
+    bib_fmt == "BK" and rights in {pd,pdus,pd-pvt}      -> 5,278,365
+    ...and us_gov_doc_flag != "1"                       -> 4,624,169
+
+That second step drops 654,196 government documents. Language is available too:
+3.18M English, 576k German, 492k French in the PD book set.
+
+WHAT IS NOT AVAILABLE: there is no genre field anywhere. Poems vs fiction vs
+research is NOT derivable from the hathifiles. No subject headings, no LC
+classification, no abstracts. (lccn is a CONTROL NUMBER, an identifier - not a
+call number, so it classifies nothing.)
+
+Routes to genre, cheapest first:
+  1. join to Gutenberg - it has real LCSH subjects and bookshelves, and ~42% of
+     Gutenberg overlaps, giving free labels plus a labelled training set
+  2. enrich via oclc_num / lccn against WorldCat or LoC
+  3. HathiTrust Bib API - full MARC per record, but one request per volume
+
+
+================================================================================
+13. IS OCLC A UNIQUE IDENTIFIER? (no - htid is)
+================================================================================
+
+13.1 DISTINCT COUNTS BY bib_fmt (all 19.6M rows)
+------------------------------------------------
+  bib_fmt      rows      distinct htid   distinct OCLC   OCLC 1st   title+author
+  BK       12,787,978      12,787,978       8,531,389   8,531,240      8,352,576
+  SE        6,581,932       6,581,932         474,328     474,167        471,776
+  MU          227,226         227,226         177,399     177,399        169,718
+  MP            6,077           6,077           3,596       3,596          2,994
+  MX            1,972           1,972             157         157          1,609
+  VM              575             575             374         374            499
+  CF               81              81              29          29             71
+  TOTAL    19,605,849      19,605,849       9,187,273   9,186,963      8,999,248
+
+Public domain only:
+  BK        5,278,365                       3,011,194   3,011,062      2,947,973
+  SE        2,759,883                         175,248     175,089        177,442
+  TOTAL     8,129,991                       3,261,828   3,261,537      3,195,528
+
+13.2 FINDINGS
+-------------
+  * htid is THE unique key - distinct htid == row count exactly, every format.
+  * OCLC identifies a WORK/EDITION, not a copy. 9.19M distinct across 19.6M rows.
+    The first three rows of the file are three htids sharing OCLC 2779601.
+  * OCLC is MULTI-VALUED in ~15.7% of rows ("217097625,252"). Raw vs first-value
+    differs by only 149 out of 8.5M distinct book values, so it rarely matters.
+  * OCLC is MISSING from 952,005 rows (4.9%), so it cannot be the sole key.
+  * The two candidate keys agree within 2% for books (8,531,240 vs 8,352,576) -
+    independent derivations landing that close is real mutual validation.
+
+13.3 COLLAPSE RATIO DIFFERS ENORMOUSLY BY FORMAT
+------------------------------------------------
+  format   all rows   public domain
+  Book       1.50x       1.75x
+  Serial    13.88x      15.76x
+  Music      1.28x       1.22x
+
+Serials collapse ~14-16x because every volume/issue of a journal shares one OCLC.
+This is a second strong argument for bib_fmt=="BK": serials are not merely a
+different genre, they inflate row counts by an order of magnitude.
+
+HEADLINE: ~3.0 MILLION distinct public-domain books. Not 19.6M rows, not 8.1M
+public-domain rows.
+
+
+================================================================================
+14. DATA DICTIONARY  ->  docs/hathitrust-data-dictionary.md
+================================================================================
+
+All 26 columns profiled empirically against the 19,605,849-row file: fill rate,
+cardinality, controlled vocabularies, min/max length, sample values. Supporting
+artifacts: data/experiment/hathi_column_profile.json (machine-readable) and
+scripts/profile_hathifile.py (re-runnable, ~2 min).
+
+Fill rates worth planning around:
+  htid, title, rights, bib_fmt  100%      oclc_num  95.1%
+  author                        65.4%     lccn      52.1%
+  description                   50.2%     issn      16.8%
+  isbn                          14.4%
+
+Five data quality traps documented there:
+  1. rights_date_used uses 9999 as a SENTINEL - 1,477,418 rows (7.54%) mean
+     "unknown", not year 9999. Filter before any date arithmetic. NOTE: the demo
+     maps this field to publication_year, so ~7.5% of HathiTrust rows display
+     9999 unless cleaned (build_catalog.py does clean it).
+  2. oclc_num is multi-valued (~15.7%).
+  3. oclc_num is not unique per row and missing from 4.9%.
+  4. Rows are volumes, not works (see collapse ratios above).
+  5. description is NOT a description - it holds volume enumeration (v.5, no.3).
+     There is no abstract/summary field anywhere in the file.
+
+
+================================================================================
+15. BOOKS WITHOUT AUTHORS
+================================================================================
+
+15.1 RATES
+----------
+  all rows (every format)        34.6%
+  book rows                      18.6%
+  DISTINCT books                 16.1%   (1,447,024 of 8,965,717)
+  DISTINCT public-domain books   11.9%   (  385,769 of 3,254,537)
+
+Deduplication improves the ratio - authorless books are duplicated slightly less
+than authored ones. Public-domain books (older, more often single-author
+monographs) are catalogued more completely than the in-copyright mass.
+
+15.2 WHY THE FIELD IS EMPTY
+---------------------------
+Almost always a work with no single personal author: edited volumes, anthologies,
+conference proceedings, corporate/government publications. Example:
+
+    title:   Poems from the Virginia quarterly review, 1925-1967.
+    imprint: University Press of Virginia [1969]
+    author:  (empty)
+
+The responsible names ARE present - inside the title, after the " / ". MARC
+records an author separately only for a personal main entry; editors and
+corporate bodies go in the statement of responsibility instead.
+
+By format: SE 66.7% missing, BK 18.6%, VM 46.4%, MP 10.2%, MU 7.0%.
+
+15.3 THE SURPRISE: CATALOGUING IS NEARLY PERFECTLY CONSISTENT
+-------------------------------------------------------------
+Works where one library recorded an author and another did not: 77. Out of 8.5
+million. Essentially zero.
+
+So authorlessness is a property of the WORK, not a cataloguing accident - every
+library independently reaches the same conclusion. The practical consequence is
+negative: missing authors CANNOT be recovered from sibling copies. They must come
+from parsing the statement of responsibility out of the title, or from external
+enrichment via oclc_num.
+
+15.4 EXTRACT  ->  demo/output/authorless_pd_books.{parquet,csv}
+---------------------------------------------------------------
+386,104 distinct works, 31 columns (all 26 hathifile columns plus n_copies,
+dedup_key, publication_year, reader_url, catalog_url). Built from 737,809
+matching rows by scripts/extract_authorless.py.
+
+  year coverage 374,976 (97.1%), range 1000-2025
+  languages     eng 259,143 | jpn 26,375 | fre 19,900 | ger 18,192 | spa 8,661
+  rights        pd 287,463 | pdus 98,635 | pd-pvt 6
+
+Most-duplicated authorless work: the United States Congressional Serial Set,
+6,892 library copies - which doubles as a caution, since that one "work" collapses
+thousands of physically distinct volumes.
+
+
+================================================================================
+16. THE COMBINED CATALOG  ->  scripts/build_catalog.py
+================================================================================
+
+16.1 DESIGN: THREE INDEPENDENTLY CACHED STAGES
+----------------------------------------------
+    python scripts/build_catalog.py --download   # both sources; skips if cached
+    python scripts/build_catalog.py --build      # merge -> combined.parquet
+    python scripts/build_catalog.py --stats      # summarize
+    python scripts/build_catalog.py --all
+    python scripts/build_catalog.py --build --force   # rebuild only
+
+Nothing re-downloads unless forced. Verified: a second --download --build printed
+only "cached ... skipping" for all three stages - zero quota, zero bytes. Each
+stage has its own --force so the merge can be rebuilt without re-fetching 1.2 GB.
+A manifest.json records what was used to build what.
+
+16.2 THE TABLE
+--------------
+  19,684,724 rows (19,605,849 hathitrust + 78,875 gutenberg), 18 columns, 1.1 GB
+  built in 77 seconds
+
+  source, id, title, author, rights, is_public_domain, bib_fmt, access, language,
+  publication_year, publisher, oclc_num, isbn, lccn, subjects, summary,
+  download_count, source_url
+
+16.3 WHY NOT JUST RETURN A DATAFRAME
+------------------------------------
+19.7M rows is 5-8 GB in pandas. load_combined() instead pushes filters into the
+Parquet reader and only materializes matching rows:
+
+    load_combined(source="gutenberg")                     78,875 rows   0.1s
+    load_combined(bib_fmt="BK", public_domain=True)    5,357,240 rows   0.4s
+    load_combined(columns=["source","rights"])        19,684,724 rows   0.1s
+    load_combined(bib_fmt="BK", public_domain=True, language="eng",
+                  columns=[...])                       3,175,913 rows   0.4s
+
+Sub-second on every query, including full-table scans, because column selection
+means only the needed columns are read. Still returns a real pandas DataFrame.
+
+16.4 TWO ASSERTIONS MADE FOR GUTENBERG (review these)
+-----------------------------------------------------
+Gutenberg's API has neither field, so to keep columns joinable:
+  bib_fmt = "BK"   - mostly true, but its catalog includes the CIA World Factbook,
+                     the 1990 US Census and the Jargon File, which are not books
+  rights  = "pd", is_public_domain = True
+                   - a COLLECTION-LEVEL assertion from PG policy, not a per-record
+                     determination like HathiTrust's
+
+Fields Gutenberg genuinely lacks (language, publisher, publication_year, oclc_num,
+isbn, lccn) are left NULL rather than guessed, so a null never masquerades as data.
+
+
+================================================================================
+17. DEDUPLICATION BY (TITLE, AUTHOR)
+================================================================================
+
+17.1 GLOBAL RESULTS
+-------------------
+  scope                       rows          distinct works   collapse
+  all HathiTrust        19,605,849           9,036,093        2.17x
+  books only (BK)       12,787,978           8,402,380        1.52x
+  public-domain books    5,278,365           2,974,683        1.77x
+
+Key = norm_full(title) + "|" + norm_author(author). The author normalization
+strips life dates so "Carroll, Lewis, 1832-1898." and "Carroll, Lewis, 1832-1898"
+merge; norm_full drops the " / statement of responsibility" and leading articles.
+
+17.2 LATEST-DETERMINATION EXTRACTS
+----------------------------------
+scripts/latest_by_title_author.py keeps, per key, the row with the newest
+rights_timestamp - preserving all 26 columns plus n_copies. Two streaming passes
+(decide winning line numbers, then re-read and emit) so memory stays bounded.
+
+  data/experiment/hathi_latest_by_title_author.{csv,parquet}  9,036,093 rows (all)
+  data/experiment/hathi_latest_books.{csv,parquet}            8,402,380 rows (BK)
+  ..._top10.csv for each
+
+Deduplicated book rights: ic 5,147,316 | pd 2,094,180 | pdus 860,956 |
+und 234,846  ->  2,955,193 public-domain books (35.2%), consistent with the ~3.0M
+OCLC-keyed figure from section 13 by an independent method.
+
+n_copies distribution (books): 79.6% singletons, 1.65M with 2-9, 1,691 with 100+.
+
+BUG FOUND AND FIXED: the copy count was packed into 14 bits to halve memory,
+capping at 16,383 - and exactly 3 rows hit that ceiling in the all-formats run,
+reporting truncated counts. Widened to 20 bits; the books-only run has zero
+saturation and all counts are exact.
+
+17.3 THE TOP-10 IS NOT WHAT YOU EXPECT
+--------------------------------------
+Even filtered to bib_fmt=BK, the most-duplicated "works" are multi-volume sets
+catalogued under one title, not famous reprinted literature:
+
+  United States Congressional serial set              12,420 copies  pdus
+  Pamphlets on Biology : Kofoid collection             2,992         pdus
+  Zhongguo fang zhi cong shu (Chinese gazetteers)      2,419         ic
+  [Bachelor's theses]                                  2,041         pdus
+  Xu xiu Si ku quan shu                                1,966         ic
+
+Nine of the ten have an EMPTY author and most carry rights_date_used = 9999. So
+bib_fmt filters out CATALOGUED serials, not SERIAL-LIKE material.
+
+
+================================================================================
+18. RIGHTS FORENSICS - WHAT "IS THIS BOOK PUBLIC DOMAIN?" ACTUALLY MEANS
+================================================================================
+
+This section is the most important practical finding of the whole project.
+
+18.1 RIGHTS ATTACH TO AN EDITION, NOT TO A TITLE OR A TEXT
+-----------------------------------------------------------
+Four HathiTrust copies share the EXACT title string
+"Alice's adventures in Wonderland / by Lewis Carroll ; with forty-two
+illustrations by John Tenniel." - and they do not agree:
+
+  htid                        rights  access  imprint                      year
+  nc01.ark:/13960/t1zc8zk18   pd      allow   Worthington, 1890            1890
+  uva.x000877405              pd      allow   D. Appleton, 1866 [c1927]    1927
+  inu.39000002601958          ic      deny    R. Clay, [195-]              1959
+  mdp.39015032113881          ic      deny    University Microfilms, 1966  1966
+
+Carroll's 1865 text and Tenniel's 1865 illustrations are long out of copyright.
+The 1959 and 1966 printings carry their own copyright in typesetting or
+reproduction. Same title, same author, same illustrator, different legal status.
+
+=> If you dedup on title+author and then read `rights` off whichever copy
+   survived, the answer here is a coin flip.
+
+Safe patterns:
+    work_is_pd = all(r in PD for r in copies.rights)      # conservative
+    usable     = copies[copies.rights.isin(PD)]           # permissive
+
+For a "is a public-domain copy available?" corpus, the permissive form is usually
+right. Here the answer is YES - the 1890 and 1927 copies are pd with access=allow.
+
+18.2 LATEST DETERMINATION FOR THAT TITLE
+----------------------------------------
+Ordered by rights_timestamp:
+  2022-12-31 19:07:31  pd   allow  uva.x000877405       (newest)
+  2013-01-31 19:48:10  pd   allow  nc01.ark:...
+  2009-04-29 10:30:14  ic   deny   inu.39000002601958
+  2006-09-13 17:16:59  ic   deny   mdp.39015032113881
+
+Verified current: all 30 daily update files published since the 2026-08-01
+snapshot were scanned, and NONE of the four htids appear in any of them - no
+rights re-determination in the last month.
+
+Caution: these are four independent judgments about four different volumes, not
+a revision history of one record. The chronology is coincidence, though a telling
+one - the two ic copies (1959, 1966 printings) were adjudicated in 2006/2009,
+while the two pd copies (1890, 1927) were done in 2013/2022.
+
+18.3 THE ANNOTATED ALICE - WHY A PD TEXT CAN BE ic
+---------------------------------------------------
+  htid                mdp.39015048847225
+  title               The annotated Alice: ... / by Lewis Carroll [pseudonym]
+                      Illustrated by John Tenniel. With an introd. and notes by
+                      Martin Gardner.
+  author              Carroll, Lewis, 1832-1898.     <- NOT Gardner
+  imprint             C. N. Potter, [1960]
+  rights              ic
+  rights_reason_code  ren   (copyright RENEWED - evidenced, not a default)
+
+Martin Gardner wrote every word of the annotations and appears ONLY inside the
+title string. Searching the author field for "Gardner" MISSES this book entirely.
+Any author-based attribution treats it as a Lewis Carroll book.
+
+Two of its four copies share lccn 60007341 but have DIFFERENT OCLC numbers
+(2023589 vs 444355) - the same work catalogued as two editions. A dedup keyed on
+OCLC keeps them apart; one keyed on LCCN merges them. No single identifier in
+this file cleanly resolves "same book".
+
+18.4 THE 17-COPY ALICE - WHY THE KEY MERGED THEM
+------------------------------------------------
+17 public-domain rows collapsed into ONE work. They are 17 genuinely different
+editions: 17 distinct OCLC numbers, 17 distinct imprints, 17 distinct
+ht_bib_keys, spanning 1869-1929 across 7 libraries.
+
+They merged because every raw title differs ONLY after the " / ":
+
+    ... / by Lewis Carroll ; with forty-two illustrations by John Tenniel.
+    ... / by Lewis Carroll ; illustrated by Arthur Rackham ; with a proem ...
+    ... / Lewis Carroll ; edited by Clifton Johnson ; illustrations by Tenniel.
+
+norm_full() cuts everything after " / ", so all 17 reduce to the same string. The
+key contains no imprint, year, publisher or OCLC - the only fields that
+distinguish these editions are exactly the ones it discards.
+
+Right or wrong depends on the question:
+  as DISTINCT WORKS   - correct. 17 printings of one 1865 book.
+  as DISTINCT EDITIONS- wrong. It merged an 1869 printing with a 1928 one, and
+                        merged pd with pdus records.
+
+Note it does the OPPOSITE elsewhere: "Alice in Wonderland" and "Alice's
+adventures in Wonderland" stay SEPARATE despite being the same text. The key
+over-collapses on the suffix and under-collapses on the prefix simultaneously -
+inherent to exact-matching a normalized string.
+
+18.5 A COMMERCIAL REPRINT (the Amazon case)
+-------------------------------------------
+  ASIN B0DNJ7VYLB, ISBN 979-8300355159, "Independently published",
+  2024-11-18, 110 pages
+
+  * NOT in HathiTrust (0 matches). The 979-8 block is Amazon KDP's; HathiTrust
+    scans library holdings, and only 544 of 18.1M dated rows are 2024 or later.
+  * The WORK is public domain - Gutenberg #11 (82,955 downloads) has the full
+    text free, and Gutenberg #114 has the Tenniel illustrations separately.
+  * Selling a public-domain work is legal. Whatever the edition ADDS (new
+    commentary, introduction, cover, typesetting) is new authorship with its own
+    copyright.
+
+As a pipeline test case this is instructive:
+    identifier lookup  -> NO MATCH (a 2024 KDP ISBN will never be in an archive)
+    title + author     -> STRONG MATCH (Gutenberg #11, HathiTrust pd copies)
+    correct answer     -> base text public domain, added apparatus is not
+
+A system that stops at the identifier returns "unknown"; one that stops at the
+title returns a confident but incomplete "yes". Encode that asymmetry
+deliberately rather than treating a failed ISBN lookup as "unknown".
+
+
+================================================================================
+19. RIGHTS TIMELINES  ->  third dashboard tab
+================================================================================
+
+19.1 WHAT THE DATA CAN AND CANNOT SHOW
+--------------------------------------
+A hathifile row stores ONE rights value and ONE rights_timestamp - the CURRENT
+determination for that volume. There is NO history column. A true per-volume
+change log is only reconstructible by diffing successive daily files (Part I
+section 4.6 measured 495 genuine rights changes in a single July daily).
+
+What the tab shows instead: the sequence of determinations HathiTrust made across
+the different COPIES of one work (title + author), ordered by decision date. The
+tab states this limitation explicitly so the chart is not misread.
+
+19.2 SCALE  (scripts/rights_timelines.py, books only)
+-----------------------------------------------------
+  works with >=2 distinct rights values   124,430  (1.48% of 8,402,380)
+  ...ever flipping INTO public domain       54,837
+  ...with 3+ distinct rights values         11,123
+  most transitions on a single work            296
+
+Outputs: demo/output/rights_timelines_summary.{parquet,csv} (124,430 works),
+rights_timelines_events.parquet (865,963 events), rights_timelines.json (top 400
+for the dashboard).
+
+Ranking note: a raw transition count is dominated by 1,200-copy multi-volume sets
+that render as noise, so display ranking prefers works with several distinct
+rights values, a real time span, and 3-40 copies - stories a reader can follow.
+
+19.3 EXAMPLE
+------------
+Andersen's Fairy Tales (ed. Svend Larsen), 25 copies, 5 distinct rights, 18 years:
+
+  ic -> und -> pd -> ic -> und -> pdus -> pd -> ic -> pd -> icus -> ic -> pd ->
+  ic -> pdus -> pd
+
+  1887 Belford Clarke / 1922 Saalfield printings   -> pd
+  1967 University Microfilms reproduction          -> ic
+  1932 Harrap edition                              -> icus, reason gatt
+                                                      (GATT/URAA restoration:
+                                                       a foreign work's US
+                                                       copyright restored by treaty)
+
+19.4 THE TAB
+------------
+Inline SVG per work: a time axis with a colour-coded dot per determination, and a
+connecting line drawn only where consecutive outcomes DIFFER, so changes read as
+visible steps. Hover gives rights - date (reason). Colours group by meaning:
+green = public domain, red/orange = restricted, grey = undetermined, blue = cc-*.
+Filters: title/author search, "only works that reach public domain", and a
+minimum-distinct-rights selector. Clicking a work shows every determination with
+date, rights, reason, access, year, imprint and htid.
+
+
+================================================================================
+20. CASE STUDY: THE TEBTUNIS PAPYRI - WHY "24 COPIES" IS MISLEADING
+================================================================================
+
+20.1 WHAT VARIES ACROSS THE 24
+------------------------------
+12 of 26 columns vary; 14 are identical.
+
+  VARIES:    htid (24), description (18), rights_timestamp (15),
+             source_bib_num (11), collection_code (11), source (10),
+             content_provider_code (10), responsible_entity_code (10),
+             rights (5), rights_reason_code (5), access (2),
+             digitization_agent_code (2), access_profile_code (2)
+
+  IDENTICAL: title, author, imprint, oclc_num, lccn, ht_bib_key (000908205),
+             rights_date_used, lang, pub_place, bib_fmt, isbn, issn,
+             us_gov_doc_flag
+
+One ht_bib_key, one OCLC, imprint "H. Frowde, Oxford University Press [etc.]
+1902-" (the trailing dash marks an open-ended set). These are NOT 24 copies of one
+book - they are roughly 5 distinct VOLUMES held by 10 libraries. The description
+column carries the volume enumeration: I, II, III:pt.1, III:pt.2, v.1, v.2, v.4,
+v.1 pt.1, P.Tebt. I, V.3 PT.1, 4:2, v.25 ...
+
+Rights differ BY VOLUME because the volumes were published years apart:
+  v.1, v.2 (1902-07)  pd / pdus   (gfv, add)
+  III pt.1            ic          (add)
+  III pt.2            icus        (gatt - US copyright restored by treaty)
+  v.4                 MIXED       (see below)
+
+20.2 THE v.4 DISAGREEMENT
+-------------------------
+Six copies all labelled "v.4" do not agree:
+
+  htid                        rights  reason  library      decided
+  iau.31858002243172          pd      add     Iowa         2024-05-17
+  uc1.31822028307387          pd      add     California   2024-05-17
+  uiuo.ark:/13960/t5z67wx2d   pd      add     Illinois     2024-05-16
+  mdp.39015070410306          pd      add     Michigan     2024-05-17
+  coo.31924011864240          ic      bib     Cornell      2026-05-10
+  umn.319510011939465         und     nfi     Minnesota    2015-02-18
+
+Confirmed independently via the public HathiTrust Bib API
+(catalog.hathitrust.org/api/volumes/full/json/recordnumber:000908205), which
+returns the same 24 items with the same rights codes.
+
+20.3 THE MARC RECORD EXPLAINS IT
+--------------------------------
+Two notes from the bibliographic record:
+
+  "The first four volumes are numbered: part I, part II, vol. III, part I,
+   vol. III, part II."
+
+  "vol. IV has imprint: London published for the British Academy by Egypt
+   Exploration S[ociety]"
+
+So "v.4" is AMBIGUOUS. Under that enumeration the FOURTH PHYSICAL VOLUME is
+vol. III part II - but there is also a genuine Volume IV from a different
+publisher, decades later. Six libraries writing "v.4" in a local holdings field
+were probably not all describing the same book.
+
+Read that way the rights are not contradictory: an early Oxford volume being pd
+and a later EES volume being ic are both plausible, and Minnesota's und/nfi is an
+explicit "no further information". STRONG HYPOTHESIS, NOT PROOF - confirming it
+needs the scans or per-item publication dates, neither of which the hathifiles
+nor the Bib API expose.
+
+20.4 CAN THE CONTENT BE COMPARED? NO
+------------------------------------
+  * hathifiles contain no content, only metadata
+  * babel.hathitrust.org returns HTTP 403 (Cloudflare) to automated requests
+  * two of the six are access=deny and not viewable by anyone without permission
+
+20.5 CONSEQUENCE FOR THE PIPELINE
+---------------------------------
+description CANNOT be trusted as a volume key. It is free-text local holdings
+data, 50.2% populated, with no standard format - this one set shows I, v. 1,
+v.1 pt.1, P.Tebt. I, 4:2 and V.3 PT.1 for the same series.
+
+An earlier suggestion of (ht_bib_key + description) as a key would merge these six
+and pick one rights value, silently blending an in-copyright later volume with
+public-domain early ones. For a public-domain corpus the safe rule is PER-htid:
+treat each scan's own rights as authoritative for that scan, and do not propagate
+a pd verdict across copies sharing a description string.
+
+
+================================================================================
+21. FILES ADDED IN PART II
+================================================================================
+
+scripts/
+  build_catalog.py            download+merge+query the combined catalog  [KEY]
+  download_all_gutenberg.py   full Gutenberg pull (superseded by the above)
+  compare_overlap.py          title normalization + overlap pass 1
+  compare_overlap2.py         title+author overlap
+  dedup_by_fmt.py             distinct counts by bib_fmt
+  profile_hathifile.py        column profiler -> data dictionary
+  authorless_books.py         authorless distinct-book counts
+  extract_authorless.py       the 386k authorless PD book extract
+  dedup_hathitrust.py         (title,author) dedup + author query
+  latest_by_title_author.py   newest determination per key, all columns
+  rights_timelines.py         divergent-rights timelines
+
+docs/
+  hathitrust-data-dictionary.md    all 26 columns, measured
+
+demo/
+  app.py                      now THREE tabs: Catalog | Authorless PD | Timelines
+  fetch_books.py              --source gutenberg|hathitrust
+  output/authorless_pd_books.{parquet,csv}
+  output/rights_timelines*.{json,parquet,csv}
+
+data/experiment/   (gitignored, ~5 GB total)
+  hathi_full_20260801.txt.gz              1.22 GB  source snapshot
+  gutenberg_all.jsonl                      206 MB  78,875 records
+  combined.parquet                         1.1 GB  19,684,724 rows
+  hathi_latest_by_title_author.{csv,pq}    2.7/1.3 GB
+  hathi_latest_books.{csv,pq}              2.5/1.2 GB
+  manifest.json, overlap_results*.json, carroll*.csv, tebtunis_copies.csv
+
+
+================================================================================
+22. OPEN ITEMS
+================================================================================
+
+22.1 ROTATE THE RAPIDAPI KEY. Still outstanding from Part I. It has been through
+     a chat session and shell history, and is a live billable credential.
+
+22.2 Quota is 147/1000 for the month. A full Gutenberg re-download needs ~790 and
+     is impossible until the quota resets. The cached JSONL is therefore
+     EXPENSIVE TO REPLACE - back it up. The HathiTrust file is free to re-fetch
+     (~20 seconds).
+
+22.3 HathiTrust is still DEMO-ONLY. It is not a provider in pd_books/providers/.
+     The evidence-backed ingestion pattern: bootstrap from a monthly full file
+     (19.6M rows, ~49s stream), apply dailies as upserts keyed on htid
+     (~215k rows/day), re-baseline from each new monthly - gaps self-heal as long
+     as you re-baseline within the ~71-day retention window. Needs no key/quota.
+
+22.4 Decide the work-identity rule before using this for duplicate detection.
+     Evidence so far: htid = scan, OCLC = work/edition (missing 4.9%),
+     title+author = over/under-collapses depending on the title's shape,
+     description = untrustworthy. A tiered key (OCLC when present, title+author
+     otherwise) with per-htid rights is the current best candidate.
+
+22.5 Fuzzy title matching would close most of the remaining Gutenberg/HathiTrust
+     overlap gap - "Twenty Thousand Leagues" vs "20,000 Leagues" fails today.
+
+22.6 A true per-volume rights change log is buildable by diffing the ~71 retained
+     dailies per htid. Would turn section 19's proxy timelines into real ones.
+
+22.7 Genre/taxonomy still unavailable from HathiTrust. Cheapest route is the
+     Gutenberg join (~42% overlap, real LCSH subjects), which also yields a
+     labelled set for training a title-based classifier.
+
 ================================================================================
 END
 ================================================================================

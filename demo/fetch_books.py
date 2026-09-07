@@ -110,6 +110,8 @@ def gutenberg_rows(books):
             "issued": book.get("issued"),
             "rights": "pd",
             "is_public_domain": True,
+            "bib_fmt": None,   # not exposed by the Gutenberg API
+
             "cover_image": book.get("cover_image"),
             "text_url": formats.get("text/plain"),
             "source_url": f"https://www.gutenberg.org/ebooks/{book.get('id')}",

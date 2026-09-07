@@ -2,7 +2,29 @@
 __pycache__/
 *.pyc
 .pytest_cache/
-data/
+# Bulk data: multi-GB downloads and derived tables (rebuild with
+# scripts/build_catalog.py). Everything under data/ is ignored EXCEPT the small
+# curated result files whitelisted below.
+#
+# Git cannot re-include a file whose parent directory is excluded, so the
+# directory has to be unexcluded step by step before the negations can bite.
+data/*
+!data/experiment/
+data/experiment/*
+#
+# Small case-study artifacts cited in SESSION_NOTES.txt (all < 60 KB). The
+# whitelist is explicit on purpose: multi-GB .csv/.parquet files sit in this
+# same directory, so an extension glob would sweep them straight back in.
+!data/experiment/alice_17_copies.csv
+!data/experiment/tebtunis_copies.csv
+!data/experiment/carroll_dedup.csv
+!data/experiment/carroll_pd_dedup.csv
+!data/experiment/hathi_latest_books_top10.csv
+!data/experiment/hathi_latest_by_title_author_top10.csv
+!data/experiment/hathi_column_profile.json
+!data/experiment/overlap_results.json
+!data/experiment/overlap_results2.json
+!data/experiment/manifest.json
 docs/api-capabilities.json
 *.egg-info/
 .DS_Store

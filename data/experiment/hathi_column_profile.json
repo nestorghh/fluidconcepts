@@ -1,0 +1,1400 @@
+{
+  "rows": 19605849,
+  "columns": [
+    {
+      "position": 1,
+      "name": "htid",
+      "fill_pct": 100.0,
+      "distinct": ">1,000,000",
+      "min_len": 6,
+      "max_len": 33,
+      "controlled_vocab": null,
+      "samples": [
+        "mdp.39015018415946",
+        "mdp.39015066356547",
+        "mdp.39015066356406"
+      ]
+    },
+    {
+      "position": 2,
+      "name": "access",
+      "fill_pct": 100.0,
+      "distinct": "2",
+      "min_len": 4,
+      "max_len": 5,
+      "controlled_vocab": [
+        [
+          "deny",
+          11352262
+        ],
+        [
+          "allow",
+          8253587
+        ]
+      ],
+      "samples": [
+        "deny",
+        "deny",
+        "deny"
+      ]
+    },
+    {
+      "position": 3,
+      "name": "rights",
+      "fill_pct": 100.0,
+      "distinct": "23",
+      "min_len": 2,
+      "max_len": 15,
+      "controlled_vocab": [
+        [
+          "ic",
+          10311741
+        ],
+        [
+          "pd",
+          5839738
+        ],
+        [
+          "pdus",
+          2288714
+        ],
+        [
+          "und",
+          963937
+        ],
+        [
+          "icus",
+          69687
+        ],
+        [
+          "cc-by-4.0",
+          28086
+        ],
+        [
+          "cc-by-nc-nd-4.0",
+          22119
+        ],
+        [
+          "und-world",
+          21218
+        ],
+        [
+          "cc-by-nc-4.0",
+          18326
+        ],
+        [
+          "cc-zero",
+          12942
+        ],
+        [
+          "ic-world",
+          7655
+        ],
+        [
+          "cc-by-nc-sa-3.0",
+          5936
+        ],
+        [
+          "op",
+          4213
+        ],
+        [
+          "cc-by-sa-4.0",
+          2165
+        ],
+        [
+          "cc-by-nc-nd-3.0",
+          1840
+        ],
+        [
+          "cc-by-nc-sa-4.0",
+          1667
+        ],
+        [
+          "pd-pvt",
+          1539
+        ],
+        [
+          "nobody",
+          1145
+        ],
+        [
+          "cc-by-nc-3.0",
+          1090
+        ],
+        [
+          "cc-by-nd-4.0",
+          889
+        ],
+        [
+          "cc-by-3.0",
+          882
+        ],
+        [
+          "cc-by-nd-3.0",
+          226
+        ],
+        [
+          "cc-by-sa-3.0",
+          94
+        ]
+      ],
+      "samples": [
+        "ic",
+        "ic",
+        "ic"
+      ]
+    },
+    {
+      "position": 4,
+      "name": "ht_bib_key",
+      "fill_pct": 100.0,
+      "distinct": ">1,000,000",
+      "min_len": 9,
+      "max_len": 9,
+      "controlled_vocab": null,
+      "samples": [
+        "000000001",
+        "000000001",
+        "000000001"
+      ]
+    },
+    {
+      "position": 5,
+      "name": "description",
+      "fill_pct": 50.19,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 200,
+      "controlled_vocab": null,
+      "samples": [
+        "v.5",
+        "v.1",
+        "v.2"
+      ]
+    },
+    {
+      "position": 6,
+      "name": "source",
+      "fill_pct": 100.0,
+      "distinct": "71",
+      "min_len": 2,
+      "max_len": 7,
+      "controlled_vocab": [
+        [
+          "MIU",
+          4987913
+        ],
+        [
+          "UC",
+          4839609
+        ],
+        [
+          "UIU",
+          1140256
+        ],
+        [
+          "HVD",
+          1006544
+        ],
+        [
+          "COO",
+          890551
+        ],
+        [
+          "UMN",
+          623195
+        ],
+        [
+          "UVA",
+          610643
+        ],
+        [
+          "NYP",
+          603016
+        ],
+        [
+          "WU",
+          572834
+        ],
+        [
+          "INU",
+          554640
+        ],
+        [
+          "TXU",
+          475012
+        ],
+        [
+          "OU",
+          468324
+        ],
+        [
+          "PST",
+          430088
+        ],
+        [
+          "CHI",
+          276838
+        ],
+        [
+          "NJP",
+          258279
+        ],
+        [
+          "IEN",
+          212439
+        ],
+        [
+          "COU",
+          145627
+        ],
+        [
+          "NNC",
+          139078
+        ],
+        [
+          "FU",
+          133832
+        ],
+        [
+          "IAU",
+          124353
+        ],
+        [
+          "UCM",
+          121338
+        ],
+        [
+          "NJR",
+          116616
+        ],
+        [
+          "LOC",
+          108892
+        ],
+        [
+          "JTKU",
+          100021
+        ],
+        [
+          "PUR",
+          86736
+        ],
+        [
+          "MIEM",
+          83770
+        ],
+        [
+          "AEU",
+          76121
+        ],
+        [
+          "CMALG",
+          73913
+        ],
+        [
+          "NJPT",
+          57596
+        ],
+        [
+          "UKOXU",
+          55430
+        ],
+        [
+          "UNC",
+          46621
+        ],
+        [
+          "GU",
+          39377
+        ],
+        [
+          "YALE",
+          26220
+        ],
+        [
+          "DUL",
+          23758
+        ],
+        [
+          "MDL",
+          21218
+        ],
+        [
+          "QMM",
+          19010
+        ],
+        [
+          "MU",
+          15788
+        ],
+        [
+          "MCHB",
+          8932
+        ],
+        [
+          "TXCM",
+          7538
+        ],
+        [
+          "CTU",
+          4637
+        ]
+      ],
+      "samples": [
+        "MIU",
+        "MIU",
+        "MIU"
+      ]
+    },
+    {
+      "position": 7,
+      "name": "source_bib_num",
+      "fill_pct": 100.0,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 3782,
+      "controlled_vocab": null,
+      "samples": [
+        "990000000010106381",
+        "990000000010106381",
+        "990000000010106381"
+      ]
+    },
+    {
+      "position": 8,
+      "name": "oclc_num",
+      "fill_pct": 95.14,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 235,
+      "controlled_vocab": null,
+      "samples": [
+        "2779601",
+        "2779601",
+        "2779601"
+      ]
+    },
+    {
+      "position": 9,
+      "name": "isbn",
+      "fill_pct": 14.36,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 5902,
+      "controlled_vocab": null,
+      "samples": [
+        "8081281584,9788081281587",
+        "8081281584,9788081281587",
+        "8081281584,9788081281587"
+      ]
+    },
+    {
+      "position": 10,
+      "name": "issn",
+      "fill_pct": 16.8,
+      "distinct": "113,548",
+      "min_len": 3,
+      "max_len": 68,
+      "controlled_vocab": null,
+      "samples": [
+        "0134-045X",
+        "0134-045X",
+        "0134-045X"
+      ]
+    },
+    {
+      "position": 11,
+      "name": "lccn",
+      "fill_pct": 52.06,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 43,
+      "controlled_vocab": null,
+      "samples": [
+        "70518371",
+        "70518371",
+        "70518371"
+      ]
+    },
+    {
+      "position": 12,
+      "name": "title",
+      "fill_pct": 100.0,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 3142,
+      "controlled_vocab": null,
+      "samples": [
+        "Slovensk\u00e9 vyst\u0315ahovalectvo / Zost. Franti\u0161ek Bielik a Elo R\u00e1ko\u0161.",
+        "Slovensk\u00e9 vyst\u0315ahovalectvo / Zost. Franti\u0161ek Bielik a Elo R\u00e1ko\u0161.",
+        "Slovensk\u00e9 vyst\u0315ahovalectvo / Zost. Franti\u0161ek Bielik a Elo R\u00e1ko\u0161."
+      ]
+    },
+    {
+      "position": 13,
+      "name": "imprint",
+      "fill_pct": 94.84,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 702,
+      "controlled_vocab": null,
+      "samples": [
+        "Matica Slovensk\u00e1, SAV, t. Svornost\u0315, 1969-",
+        "Matica Slovensk\u00e1, SAV, t. Svornost\u0315, 1969-",
+        "Matica Slovensk\u00e1, SAV, t. Svornost\u0315, 1969-"
+      ]
+    },
+    {
+      "position": 14,
+      "name": "rights_reason_code",
+      "fill_pct": 100.0,
+      "distinct": "16",
+      "min_len": 3,
+      "max_len": 4,
+      "controlled_vocab": [
+        [
+          "bib",
+          17994797
+        ],
+        [
+          "gfv",
+          367126
+        ],
+        [
+          "ren",
+          291658
+        ],
+        [
+          "ncn",
+          260953
+        ],
+        [
+          "add",
+          201974
+        ],
+        [
+          "nfi",
+          132047
+        ],
+        [
+          "con",
+          124797
+        ],
+        [
+          "gatt",
+          69686
+        ],
+        [
+          "cdpp",
+          66380
+        ],
+        [
+          "exp",
+          51526
+        ],
+        [
+          "crms",
+          19698
+        ],
+        [
+          "man",
+          18027
+        ],
+        [
+          "ipma",
+          4612
+        ],
+        [
+          "pvt",
+          2369
+        ],
+        [
+          "del",
+          197
+        ],
+        [
+          "unp",
+          2
+        ]
+      ],
+      "samples": [
+        "bib",
+        "bib",
+        "bib"
+      ]
+    },
+    {
+      "position": 15,
+      "name": "rights_timestamp",
+      "fill_pct": 100.0,
+      "distinct": "267,968",
+      "min_len": 19,
+      "max_len": 19,
+      "controlled_vocab": null,
+      "samples": [
+        "2011-09-15 04:30:52",
+        "2012-05-14 19:32:09",
+        "2012-05-05 19:30:21"
+      ]
+    },
+    {
+      "position": 16,
+      "name": "us_gov_doc_flag",
+      "fill_pct": 100.0,
+      "distinct": "2",
+      "min_len": 1,
+      "max_len": 1,
+      "controlled_vocab": [
+        [
+          "0",
+          18302605
+        ],
+        [
+          "1",
+          1303244
+        ]
+      ],
+      "samples": [
+        "0",
+        "0",
+        "0"
+      ]
+    },
+    {
+      "position": 17,
+      "name": "rights_date_used",
+      "fill_pct": 100.0,
+      "distinct": "972",
+      "min_len": 4,
+      "max_len": 4,
+      "controlled_vocab": null,
+      "samples": [
+        "9999",
+        "9999",
+        "9999"
+      ]
+    },
+    {
+      "position": 18,
+      "name": "pub_place",
+      "fill_pct": 99.04,
+      "distinct": "1,493",
+      "min_len": 1,
+      "max_len": 3,
+      "controlled_vocab": null,
+      "samples": [
+        "xo",
+        "xo",
+        "xo"
+      ]
+    },
+    {
+      "position": 19,
+      "name": "lang",
+      "fill_pct": 99.43,
+      "distinct": "660",
+      "min_len": 1,
+      "max_len": 3,
+      "controlled_vocab": null,
+      "samples": [
+        "slo",
+        "slo",
+        "slo"
+      ]
+    },
+    {
+      "position": 20,
+      "name": "bib_fmt",
+      "fill_pct": 100.0,
+      "distinct": "8",
+      "min_len": 2,
+      "max_len": 2,
+      "controlled_vocab": [
+        [
+          "BK",
+          12787978
+        ],
+        [
+          "SE",
+          6581932
+        ],
+        [
+          "MU",
+          227226
+        ],
+        [
+          "MP",
+          6077
+        ],
+        [
+          "MX",
+          1972
+        ],
+        [
+          "VM",
+          575
+        ],
+        [
+          "CF",
+          81
+        ],
+        [
+          "XX",
+          8
+        ]
+      ],
+      "samples": [
+        "BK",
+        "BK",
+        "BK"
+      ]
+    },
+    {
+      "position": 21,
+      "name": "collection_code",
+      "fill_pct": 100.0,
+      "distinct": "98",
+      "min_len": 2,
+      "max_len": 9,
+      "controlled_vocab": [
+        [
+          "MIU",
+          4762157
+        ],
+        [
+          "NRLF",
+          2842333
+        ],
+        [
+          "UIUC",
+          1021390
+        ],
+        [
+          "HVD",
+          1006544
+        ],
+        [
+          "COO",
+          890551
+        ],
+        [
+          "UMN",
+          623195
+        ],
+        [
+          "UVA",
+          610643
+        ],
+        [
+          "NYP",
+          603016
+        ],
+        [
+          "UCSD",
+          583356
+        ],
+        [
+          "WU",
+          572834
+        ],
+        [
+          "INU",
+          554640
+        ],
+        [
+          "TXU",
+          475012
+        ],
+        [
+          "OSU",
+          468324
+        ],
+        [
+          "PST",
+          428101
+        ],
+        [
+          "UCBK",
+          296751
+        ],
+        [
+          "CHI",
+          276838
+        ],
+        [
+          "NJP",
+          258279
+        ],
+        [
+          "UCLA",
+          254192
+        ],
+        [
+          "UCSC",
+          234402
+        ],
+        [
+          "NWU",
+          212439
+        ],
+        [
+          "UCR",
+          168338
+        ],
+        [
+          "COU",
+          145627
+        ],
+        [
+          "SRLF",
+          143721
+        ],
+        [
+          "IAU",
+          124353
+        ],
+        [
+          "UCM",
+          121338
+        ],
+        [
+          "UFDC",
+          119067
+        ],
+        [
+          "NJR",
+          116616
+        ],
+        [
+          "ILOC",
+          108892
+        ],
+        [
+          "UCD",
+          108492
+        ],
+        [
+          "IUIUC",
+          107678
+        ],
+        [
+          "NNC",
+          102117
+        ],
+        [
+          "KEIO",
+          100021
+        ],
+        [
+          "ISRLF",
+          97137
+        ],
+        [
+          "PUR",
+          86734
+        ],
+        [
+          "UMLAW",
+          86366
+        ],
+        [
+          "MSU",
+          83770
+        ],
+        [
+          "INRLF",
+          82873
+        ],
+        [
+          "AEU",
+          76121
+        ],
+        [
+          "GRI",
+          73913
+        ],
+        [
+          "GWLA",
+          68093
+        ]
+      ],
+      "samples": [
+        "MIU",
+        "MIU",
+        "MIU"
+      ]
+    },
+    {
+      "position": 22,
+      "name": "content_provider_code",
+      "fill_pct": 100.0,
+      "distinct": "75",
+      "min_len": 2,
+      "max_len": 22,
+      "controlled_vocab": [
+        [
+          "umich",
+          4919806
+        ],
+        [
+          "universityofcalifornia",
+          4839609
+        ],
+        [
+          "illinois",
+          1140256
+        ],
+        [
+          "harvard",
+          1006544
+        ],
+        [
+          "cornell",
+          890551
+        ],
+        [
+          "umn",
+          623195
+        ],
+        [
+          "virginia",
+          610643
+        ],
+        [
+          "nypl",
+          603016
+        ],
+        [
+          "wisc",
+          572834
+        ],
+        [
+          "iu",
+          554640
+        ],
+        [
+          "utexas",
+          475012
+        ],
+        [
+          "osu",
+          468324
+        ],
+        [
+          "psu",
+          430088
+        ],
+        [
+          "uchicago",
+          276838
+        ],
+        [
+          "princeton",
+          258279
+        ],
+        [
+          "northwestern",
+          212439
+        ],
+        [
+          "colorado",
+          145627
+        ],
+        [
+          "columbia",
+          139078
+        ],
+        [
+          "flbog",
+          133832
+        ],
+        [
+          "uiowa",
+          124353
+        ],
+        [
+          "ucm",
+          121338
+        ],
+        [
+          "rutgers",
+          116616
+        ],
+        [
+          "loc",
+          108892
+        ],
+        [
+          "keio",
+          100021
+        ],
+        [
+          "purdue",
+          86736
+        ],
+        [
+          "msu",
+          83770
+        ],
+        [
+          "ualberta",
+          76121
+        ],
+        [
+          "getty",
+          73913
+        ],
+        [
+          "technicalreports",
+          68093
+        ],
+        [
+          "ptsem",
+          57596
+        ],
+        [
+          "ox",
+          55430
+        ],
+        [
+          "unc",
+          46621
+        ],
+        [
+          "uga",
+          39377
+        ],
+        [
+          "yale",
+          26220
+        ],
+        [
+          "duke",
+          23758
+        ],
+        [
+          "mndigital",
+          21218
+        ],
+        [
+          "mcgill",
+          19010
+        ],
+        [
+          "umass",
+          15788
+        ],
+        [
+          "bc",
+          8932
+        ],
+        [
+          "tamu",
+          7538
+        ]
+      ],
+      "samples": [
+        "umich",
+        "umich",
+        "umich"
+      ]
+    },
+    {
+      "position": 23,
+      "name": "responsible_entity_code",
+      "fill_pct": 100.0,
+      "distinct": "69",
+      "min_len": 2,
+      "max_len": 22,
+      "controlled_vocab": [
+        [
+          "umich",
+          4988274
+        ],
+        [
+          "universityofcalifornia",
+          4839609
+        ],
+        [
+          "illinois",
+          1140256
+        ],
+        [
+          "harvard",
+          1006544
+        ],
+        [
+          "cornell",
+          890551
+        ],
+        [
+          "umn",
+          644413
+        ],
+        [
+          "virginia",
+          610643
+        ],
+        [
+          "nypl",
+          603016
+        ],
+        [
+          "wisc",
+          572834
+        ],
+        [
+          "iu",
+          554640
+        ],
+        [
+          "utexas",
+          475012
+        ],
+        [
+          "osu",
+          468324
+        ],
+        [
+          "psu",
+          430088
+        ],
+        [
+          "uchicago",
+          276838
+        ],
+        [
+          "princeton",
+          258279
+        ],
+        [
+          "northwestern",
+          212439
+        ],
+        [
+          "colorado",
+          145627
+        ],
+        [
+          "columbia",
+          139078
+        ],
+        [
+          "flbog",
+          133832
+        ],
+        [
+          "uiowa",
+          124353
+        ],
+        [
+          "ucm",
+          121338
+        ],
+        [
+          "rutgers",
+          116616
+        ],
+        [
+          "loc",
+          108892
+        ],
+        [
+          "keio",
+          100021
+        ],
+        [
+          "purdue",
+          86736
+        ],
+        [
+          "msu",
+          83770
+        ],
+        [
+          "ualberta",
+          76121
+        ],
+        [
+          "getty",
+          73913
+        ],
+        [
+          "ptsem",
+          57596
+        ],
+        [
+          "ox",
+          55430
+        ],
+        [
+          "unc",
+          46621
+        ],
+        [
+          "uga",
+          39377
+        ],
+        [
+          "yale",
+          26220
+        ],
+        [
+          "duke",
+          23758
+        ],
+        [
+          "mcgill",
+          19010
+        ],
+        [
+          "umass",
+          15788
+        ],
+        [
+          "bc",
+          8932
+        ],
+        [
+          "tamu",
+          7538
+        ],
+        [
+          "uconn",
+          4637
+        ],
+        [
+          "ncsu",
+          3196
+        ]
+      ],
+      "samples": [
+        "umich",
+        "umich",
+        "umich"
+      ]
+    },
+    {
+      "position": 24,
+      "name": "digitization_agent_code",
+      "fill_pct": 100.0,
+      "distinct": "65",
+      "min_len": 2,
+      "max_len": 14,
+      "controlled_vocab": [
+        [
+          "google",
+          18421311
+        ],
+        [
+          "ia",
+          748389
+        ],
+        [
+          "lit-dlps-dc",
+          129017
+        ],
+        [
+          "cornell-ms",
+          75805
+        ],
+        [
+          "berkeley",
+          56994
+        ],
+        [
+          "yale",
+          23678
+        ],
+        [
+          "umich",
+          22608
+        ],
+        [
+          "mcgill",
+          19010
+        ],
+        [
+          "cornell",
+          13765
+        ],
+        [
+          "getty",
+          12958
+        ],
+        [
+          "uiuc",
+          11189
+        ],
+        [
+          "mdl",
+          10717
+        ],
+        [
+          "mhs",
+          10501
+        ],
+        [
+          "northwestern",
+          8924
+        ],
+        [
+          "tamu",
+          7538
+        ],
+        [
+          "nnc",
+          5618
+        ],
+        [
+          "geu",
+          2636
+        ],
+        [
+          "yale2",
+          2542
+        ],
+        [
+          "mou",
+          2312
+        ],
+        [
+          "princeton",
+          2094
+        ],
+        [
+          "uf",
+          2078
+        ],
+        [
+          "wau",
+          1935
+        ],
+        [
+          "bc",
+          1329
+        ],
+        [
+          "ucsd",
+          1187
+        ],
+        [
+          "umd",
+          1174
+        ],
+        [
+          "ump",
+          1140
+        ],
+        [
+          "virginia",
+          1110
+        ],
+        [
+          "osu",
+          926
+        ],
+        [
+          "umn",
+          889
+        ],
+        [
+          "ucla",
+          849
+        ],
+        [
+          "aub",
+          790
+        ],
+        [
+          "asu",
+          476
+        ],
+        [
+          "miami",
+          446
+        ],
+        [
+          "buffalo",
+          398
+        ],
+        [
+          "upenn",
+          369
+        ],
+        [
+          "clark",
+          361
+        ],
+        [
+          "ucm",
+          352
+        ],
+        [
+          "temple",
+          348
+        ],
+        [
+          "case",
+          339
+        ],
+        [
+          "chtanc",
+          238
+        ]
+      ],
+      "samples": [
+        "google",
+        "google",
+        "google"
+      ]
+    },
+    {
+      "position": 25,
+      "name": "access_profile_code",
+      "fill_pct": 100.0,
+      "distinct": "4",
+      "min_len": 4,
+      "max_len": 11,
+      "controlled_vocab": [
+        [
+          "google",
+          17437301
+        ],
+        [
+          "open",
+          2146019
+        ],
+        [
+          "page+lowres",
+          21218
+        ],
+        [
+          "page",
+          1311
+        ]
+      ],
+      "samples": [
+        "google",
+        "google",
+        "google"
+      ]
+    },
+    {
+      "position": 26,
+      "name": "author",
+      "fill_pct": 65.38,
+      "distinct": ">1,000,000",
+      "min_len": 1,
+      "max_len": 1026,
+      "controlled_vocab": null,
+      "samples": [
+        "Bielik, Franti\u0161ek,",
+        "Bielik, Franti\u0161ek,",
+        "Bielik, Franti\u0161ek,"
+      ]
+    }
+  ]
+}
